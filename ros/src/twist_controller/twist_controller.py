@@ -19,7 +19,7 @@ class Controller(object):
         ki = 0.1
         kd = 0
         mn = 0
-        mx = 0.2
+        mx = 0.25
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
         
         # vel filter
@@ -37,7 +37,7 @@ class Controller(object):
            
         self.last_time = rospy.get_time()
 
-    def control(self, current_vel, dbw_enabled, target_vel, target_angle_vel):
+    def control(self, current_vel,current_angle_vel, dbw_enabled, target_vel, target_angle_vel):
         # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
         
