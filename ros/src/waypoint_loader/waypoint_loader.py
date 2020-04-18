@@ -123,10 +123,37 @@ class WaypointLoader(object):
         return waypoints
     
     def limit_velocity(self,waypoints):
+        # limit by curvature
         for i,wp in enumerate(waypoints):
             waypoints[i].twist.twist.linear.x = np.minimum(waypoints[i].twist.twist.linear.x, np.sqrt(MAX_ACCEL_Y/max(1.0e-7,abs(waypoints[i].curvature))))
-        
+            
+        # ensure maximum longitudinal acceleration
+        for i in range(len(waypoints)-1,0,-1):
+            delta_s = waypoints[i].distance - waypoints[i-1].distance
+            v0 = waypoints[i].twist.twist.linear.x
+            v1 = waypoints[i-1].twist.twist.linear.x
+            v_lower_bound = np.sqrt(max(0.0,v0*v0 - 2*MAX_ACCEL_X*delta_s))
+            v_upper_bound = np.sqrt(max(0.0,v0*v0 + 2*MAX_ACCEL_X*delta_s))
+            if v1 > v_upper_bound:
+                v1 = v_upper_bound
+            elif v1 < v_lower_bound:
+                v1 = v_lower_bound
                 
+            waypoints[i-1].twist.twist.linear.x = v1
+        
+        for i in range(len(waypoints)-1):
+            delta_s = waypoints[i+1].distance - waypoints[i].distance
+            v0 = waypoints[i].twist.twist.linear.x
+            v1 = waypoints[i+1].twist.twist.linear.x
+            v_lower_bound = np.sqrt(max(0.0,v0*v0 - 2*MAX_ACCEL_X*delta_s))
+            v_upper_bound = np.sqrt(max(0.0,v0*v0 + 2*MAX_ACCEL_X*delta_s))
+            if v1 > v_upper_bound:
+                v1 = v_upper_bound
+            elif v1 < v_lower_bound:
+                v1 = v_lower_bound
+                
+            waypoints[i+1].twist.twist.linear.x = v1     
+        
         return waypoints
 
     def publish(self, waypoints):

@@ -17,7 +17,7 @@ class TLClassifier(object):
         cwd = os.path.dirname(os.path.realpath(__file__))
 
         # Default to Simulation with 10 regions.
-        CKPT = cwd+'/graphs/ssd_mobilenet_v2_fine_ud/frozen_inference_graph.pb'
+        CKPT = cwd+'/graphs/ssd_mobilenet_v2_fine_ud_v3/graph_optimized.pb'
 
 
         # 14, as pretrained on bosch dataset with 14 classes
