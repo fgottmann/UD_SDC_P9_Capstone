@@ -38,6 +38,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         #rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
         
+        # Publish waypoints
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
@@ -108,29 +109,38 @@ class WaypointUpdater(object):
             lane.waypoints = points
         else:
             lane.waypoints = self.decelerate_waypoints(points, closest_idx)
+            
+         # calculate acceleration
+        for i,wp in enumerate(waypoints):
+            if i == 0:
+                d_v = (lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i].twist.twist.linear.x)/np.maximum(0.001,lane.waypoints[i+1].distance - lane.waypoints[i].distance)
+                v_mean = 0.5*(lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v / np.maximum(0.2,v_mean)
+            elif i == len(waypoints) - 1:
+                d_v = (lane.waypoints[i].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)/np.maximum(0.001,lane.waypoints[i].distance - lane.waypoints[i-1].distance)
+                v_mean = 0.5*(lane.waypoints[i].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v / np.maximum(0.2,v_mean)
+            else:
+                d_v = (lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)/np.maximum(0.001,lane.waypoints[i+1].distance - lane.waypoints[i-1].distance)
+                v_mean = 0.5*(lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)
+                lane.waypoints[i].acceleration_x = d_v / np.maximum(0.2,v_mean)
         
         return lane    
         
     def publish_waypoints(self,closest_idx):
-        #lane = Lane()
-        #lane.header = self.base_waypoints.header
-        #lane.waypoints = self.base_waypoints.waypoints[closest_idx:(closest_idx + LOOKAHEAD_WPS)]
         final_lane = self.generate_lane()
         self.final_waypoints_pub.publish(final_lane)
 
     def pose_cb(self, msg):
-        # TODO: Implement
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
-        self.base_waypoints = waypoints
         if not self.waypoints_2d:
+            self.base_waypoints = waypoints
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
         self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):

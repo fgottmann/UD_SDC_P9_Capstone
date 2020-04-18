@@ -10,9 +10,12 @@ from styx_msgs.msg import Lane, Waypoint
 
 import tf
 import rospy
+import numpy as np
 
 CSV_HEADER = ['x', 'y', 'z', 'yaw']
-MAX_DECEL = 1.0
+MAX_ACCEL_X = 1.5
+MAX_ACCEL_Y = 1.5
+MAX_DECEL_END = 1.0
 
 
 class WaypointLoader(object):
@@ -44,7 +47,7 @@ class WaypointLoader(object):
         waypoints = []
         with open(fname) as wfile:
             reader = csv.DictReader(wfile, CSV_HEADER)
-            for wp in reader:
+            for i,wp in enumerate(reader):
                 p = Waypoint()
                 p.pose.pose.position.x = float(wp['x'])
                 p.pose.pose.position.y = float(wp['y'])
@@ -52,23 +55,74 @@ class WaypointLoader(object):
                 q = self.quaternion_from_yaw(float(wp['yaw']))
                 p.pose.pose.orientation = Quaternion(*q)
                 p.twist.twist.linear.x = float(self.velocity)
+                # calculate distance vector
+                if i == 0:
+                    p.distance = 0
+                else:
+                    p.distance = waypoints[-1].distance + self.distance(p.pose.pose.position,waypoints[-1].pose.pose.position)
 
                 waypoints.append(p)
-        return self.decelerate(waypoints)
+        
+         # calculate curvature (requires at least 3 nodes)
+        dd_x = 0;
+        dd_y = 0;
+        dd_x_prev = 0;
+        dd_y_prev = 0;
+        for i,wp in enumerate(waypoints):
+            if i == 0:
+                dd_x = cos(waypoints[i + 2].pose.pose.orientation) - cos(waypoints[i+1].pose.pose.orientation)/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
+                dd_y = sin(waypoints[i + 2].pose.pose.orientation) - sin(waypoints[i+1].pose.pose.orientation)/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
+                dd_x_prev = cos(waypoints[i + 1].pose.pose.orientation) - cos(waypoints[i].pose.pose.orientation)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
+                dd_y_prev = sin(waypoints[i + 1].pose.pose.orientation) - sin(waypoints[i].pose.pose.orientation)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
+                waypoints[i].curvature = cos(wp.pose.pose.orientation)*0.5(dd_y + dd_y_prev) - sin(wp.pose.pose.orientation)*0.5(dd_x + dd_x_prev)
+            elif i == len(waypoints) - 1:
+                waypoints[i].curvature = waypoints[i-1].curvature
+            else:
+                dd_x = cos(waypoints[i + 2].pose.pose.orientation) - cos(waypoints[i+1].pose.pose.orientation)/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
+                dd_y = sin(waypoints[i+2].pose.pose.orientation) - sin(waypoints[i+1].pose.pose.orientation)/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
+                waypoints[i].curvature = cos(wp.pose.pose.orientation)*0.5(dd_y + dd_y_prev) - sin(wp.pose.pose.orientation)*0.5(dd_x + dd_x_prev)
+                dd_x_prev = dd_x
+                dd_y_prev = dd_y             
+                
+                
+        waypoints = self.decelerateAtEnd(waypoints)
+        waypoints = self.limit_velocity(waypoints) # limit velocity at end and during cornering
+        
+         # calculate acceleration
+        for i,wp in enumerate(waypoints):
+            if i == 0:
+                d_v = (waypoints[i+1].twist.twist.linear.x - waypoints[i].twist.twist.linear.x)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
+                v_mean = 0.5*(waypoints[i+1].twist.twist.linear.x - waypoints[i].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v / max(0.2,v_mean)
+            elif i == len(waypoints) - 1:
+                d_v = (waypoints[i].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)/max(0.001,waypoints[i].distance - waypoints[i-1].distance)
+                v_mean = 0.5*(waypoints[i].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v / max(0.2,v_mean)
+            else:
+                d_v = (waypoints[i+1].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)/max(0.001,waypoints[i+1].distance - waypoints[i-1].distance)
+                v_mean = 0.5*(waypoints[i+1].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v / max(0.2,v_mean)
 
     def distance(self, p1, p2):
         x, y, z = p1.x - p2.x, p1.y - p2.y, p1.z - p2.z
         return math.sqrt(x*x + y*y + z*z)
 
-    def decelerate(self, waypoints):
+    def decelerateAtEnd(self, waypoints):
         last = waypoints[-1]
         last.twist.twist.linear.x = 0.
         for wp in waypoints[:-1][::-1]:
             dist = self.distance(wp.pose.pose.position, last.pose.pose.position)
-            vel = math.sqrt(2 * MAX_DECEL * dist)
+            vel = math.sqrt(2 * MAX_DECEL_END * dist)
             if vel < 1.:
                 vel = 0.
             wp.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
+        return waypoints
+    
+    def limit_velocity(self,waypoints):
+        for i,wp in enumerate(waypoints):
+            waypoints[i].twist.twist.linear.x = np.minimum(waypoints[i].twist.twist.linear.x, sqrt(MAX_ACCEL_Y/max(1.0e-7,abs(waypoints[i].curvature))))
+        
+                
         return waypoints
 
     def publish(self, waypoints):
