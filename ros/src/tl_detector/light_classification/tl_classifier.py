@@ -17,7 +17,7 @@ class TLClassifier(object):
         cwd = os.path.dirname(os.path.realpath(__file__))
 
         # Default to Simulation with 10 regions.
-        CKPT = cwd+'/graphs/ssd_mobilenet_v2/frozen_inference_graph.pb'
+        CKPT = cwd+'/graphs/ssd_mobilenet_v2_fine_ud/frozen_inference_graph.pb'
 
 
         # 14, as pretrained on bosch dataset with 14 classes
@@ -65,7 +65,7 @@ class TLClassifier(object):
         if run_network is True:
             image_np_expanded = np.expand_dims(image, axis=0)
 
-            #time0 = time.time()
+            time0 = time.time()
 
             # Actual detection.
             with self.detection_graph.as_default():  
@@ -74,7 +74,7 @@ class TLClassifier(object):
                         feed_dict={self.image_tensor: image_np_expanded})               
 
 
-            #time1 = time.time()
+            time1 = time.time()
 
             #print("Time in milliseconds", (time1 - time0) * 1000) 
             
@@ -98,6 +98,6 @@ class TLClassifier(object):
                     min_score_thresh = scores[i]
 
         
-        print("{} and {}".format(self.current_light,min_score_thresh))
+       # print("{} and {}".format(self.current_light,min_score_thresh))
        
         return self.current_light

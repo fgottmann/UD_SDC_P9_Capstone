@@ -4,6 +4,7 @@ import rospy
 from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped
+from styx_msgs.msg import Lane, Waypoint
 import math
 
 from twist_controller import Controller
@@ -46,7 +47,8 @@ class DBWNode(object):
         # TODO: Subscribe to all the topics you need to
         rospy.Subscriber('/vehicle/dbw_enabled',Bool,self.dbw_enabled_cb)
         rospy.Subscriber('/twist_cmd',TwistStamped,self.req_cb)
-        rospy.Subscriber('/current_velocity',TwistStamped,self.meas_cb)
+        rospy.Subscriber('/current_velocity',TwistStamped,self.meas_cb)        
+        rospy.Subscriber('/final_waypoints', Lane, self.final_waypoints_cb)
         
         # local quantities
         self.current_vel = None
@@ -55,6 +57,7 @@ class DBWNode(object):
         self.target_vel = None
         self.target_angle_vel = None
         self.throttle = self.steering = self.brake = 0
+        self.final_waypoints = None
 
         self.loop()
 
@@ -91,6 +94,9 @@ class DBWNode(object):
     def meas_cb(self,msg):
         self.current_vel = msg.twist.linear.x
         self.current_angle_vel = msg.twist.angular.z
+    
+    def final_waypoints_cb(self,msg):
+        self.final_waypoints = msg
         
     def publish(self, throttle, brake, steer):
         tcmd = ThrottleCmd()
