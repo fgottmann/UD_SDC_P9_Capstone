@@ -72,16 +72,16 @@ class WaypointLoader(object):
         dd_y_prev = 0;
         for i,wp in enumerate(waypoints):
             if i == 0:
-                dd_x = np.cos(waypoints[i + 2].yaw) - np.cos(waypoints[i+1].yaw)/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
-                dd_y = np.sin(waypoints[i + 2].yaw) - np.sin(waypoints[i+1].yaw)/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
-                dd_x_prev = np.cos(waypoints[i + 1].yaw) - np.cos(waypoints[i].yaw)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
-                dd_y_prev = np.sin(waypoints[i + 1].yaw) - np.sin(waypoints[i].yaw)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
+                dd_x = (np.cos(waypoints[i + 2].yaw) - np.cos(waypoints[i+1].yaw))/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
+                dd_y = (np.sin(waypoints[i + 2].yaw) - np.sin(waypoints[i+1].yaw))/max(0.001,waypoints[i+2].distance - waypoints[i+1].distance)
+                dd_x_prev = (np.cos(waypoints[i + 1].yaw) - np.cos(waypoints[i].yaw))/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
+                dd_y_prev = (np.sin(waypoints[i + 1].yaw) - np.sin(waypoints[i].yaw))/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
                 waypoints[i].curvature = np.cos(wp.yaw)*0.5*(dd_y + dd_y_prev) - np.sin(wp.yaw)*0.5*(dd_x + dd_x_prev)
             elif i == len(waypoints) - 1:
                 waypoints[i].curvature = waypoints[i-1].curvature
             else:
-                dd_x = np.cos(waypoints[i + 1].yaw) - np.cos(waypoints[i].yaw)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
-                dd_y = np.sin(waypoints[i + 1].yaw) - np.sin(waypoints[i].yaw)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
+                dd_x = (np.cos(waypoints[i + 1].yaw) - np.cos(waypoints[i].yaw))/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
+                dd_y = (np.sin(waypoints[i + 1].yaw) - np.sin(waypoints[i].yaw))/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
                 waypoints[i].curvature = np.cos(wp.yaw)*0.5*(dd_y + dd_y_prev) - np.sin(wp.yaw)*0.5*(dd_x + dd_x_prev)
                 dd_x_prev = dd_x
                 dd_y_prev = dd_y             
@@ -94,16 +94,16 @@ class WaypointLoader(object):
         for i,wp in enumerate(waypoints):
             if i == 0:
                 d_v = (waypoints[i+1].twist.twist.linear.x - waypoints[i].twist.twist.linear.x)/max(0.001,waypoints[i+1].distance - waypoints[i].distance)
-                v_mean = 0.5*(waypoints[i+1].twist.twist.linear.x - waypoints[i].twist.twist.linear.x)
-                waypoints[i].acceleration_x = d_v / max(0.2,v_mean)
+                v_mean = 0.5*(waypoints[i+1].twist.twist.linear.x + waypoints[i].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v * max(0.2,v_mean)
             elif i == len(waypoints) - 1:
                 d_v = (waypoints[i].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)/max(0.001,waypoints[i].distance - waypoints[i-1].distance)
-                v_mean = 0.5*(waypoints[i].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)
-                waypoints[i].acceleration_x = d_v / max(0.2,v_mean)
+                v_mean = 0.5*(waypoints[i].twist.twist.linear.x + waypoints[i-1].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v * max(0.2,v_mean)
             else:
                 d_v = (waypoints[i+1].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)/max(0.001,waypoints[i+1].distance - waypoints[i-1].distance)
-                v_mean = 0.5*(waypoints[i+1].twist.twist.linear.x - waypoints[i-1].twist.twist.linear.x)
-                waypoints[i].acceleration_x = d_v / max(0.2,v_mean)
+                v_mean = 0.5*(waypoints[i+1].twist.twist.linear.x + waypoints[i-1].twist.twist.linear.x)
+                waypoints[i].acceleration_x = d_v * max(0.2,v_mean)
                 
         return waypoints
 

@@ -213,7 +213,7 @@ class TLDetector(object):
         a_stop = 1.0
         stop_t = np.abs(self.velocity.twist.linear.x)/a_stop
         stop_distance = np.abs(self.velocity.twist.linear.x) - 0.5*a_stop*(stop_t**2)
-        if closest_light:# and self.dist_light <= max(40.0,max(5.0*np.abs(self.velocity.twist.linear.x),2.0*stop_distance + 1.0*np.abs(self.velocity.twist.linear.x))): # only return waypoint if its close
+        if closest_light and self.dist_light <= max(20.0,max(4.0*np.abs(self.velocity.twist.linear.x),1.5*stop_distance + 1.0*np.abs(self.velocity.twist.linear.x))): # only return waypoint if its close
             state = self.get_light_state(closest_light)
             return line_wp_idx, state
         

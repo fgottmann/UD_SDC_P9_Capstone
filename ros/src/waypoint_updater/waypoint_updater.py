@@ -25,7 +25,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-MAX_DECEL = 1.5
+MAX_DECEL = 2
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -95,6 +95,10 @@ class WaypointUpdater(object):
                 vel = 0.
                 
             p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
+            p.yaw = wp.yaw
+            p.curvature = wp.curvature
+            p.distance = wp.distance
+            
             temp.append(p)
             
         return temp
@@ -116,16 +120,16 @@ class WaypointUpdater(object):
             for i,wp in enumerate(lane.waypoints):
                 if i == 0:
                     d_v = (lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i].twist.twist.linear.x)/np.maximum(0.001,lane.waypoints[i+1].distance - lane.waypoints[i].distance)
-                    v_mean = 0.5*(lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i].twist.twist.linear.x)
-                    lane.waypoints[i].acceleration_x = d_v / np.maximum(0.2,v_mean)
+                    v_mean = 0.5*(lane.waypoints[i+1].twist.twist.linear.x + lane.waypoints[i].twist.twist.linear.x)
+                    lane.waypoints[i].acceleration_x = d_v * np.maximum(0.2,v_mean)
                 elif i == len(lane.waypoints) - 1:
                     d_v = (lane.waypoints[i].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)/np.maximum(0.001,lane.waypoints[i].distance - lane.waypoints[i-1].distance)
-                    v_mean = 0.5*(lane.waypoints[i].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)
-                    lane.waypoints[i].acceleration_x = d_v / np.maximum(0.2,v_mean)
+                    v_mean = 0.5*(lane.waypoints[i].twist.twist.linear.x + lane.waypoints[i-1].twist.twist.linear.x)
+                    lane.waypoints[i].acceleration_x = d_v * np.maximum(0.2,v_mean)
                 else:
                     d_v = (lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)/np.maximum(0.001,lane.waypoints[i+1].distance - lane.waypoints[i-1].distance)
-                    v_mean = 0.5*(lane.waypoints[i+1].twist.twist.linear.x - lane.waypoints[i-1].twist.twist.linear.x)
-                    lane.waypoints[i].acceleration_x = d_v / np.maximum(0.2,v_mean)
+                    v_mean = 0.5*(lane.waypoints[i+1].twist.twist.linear.x + lane.waypoints[i-1].twist.twist.linear.x)
+                    lane.waypoints[i].acceleration_x = d_v * np.maximum(0.2,v_mean)
         else:
             lane.waypoints[0].acceleration_x = 0
         
