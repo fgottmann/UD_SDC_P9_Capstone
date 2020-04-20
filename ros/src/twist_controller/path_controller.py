@@ -58,7 +58,8 @@ class PathController(object):
         self.kappa_pred = None
         self.valid = False
         self.last_steering = None
-           
+    
+    # lqr with kappa_dot as input assuming kappa_path as constant
     def lqr_lat(self,v): 
         v = max(2.0,v)
         A = np.matrix([[0,v,0],
@@ -70,7 +71,7 @@ class PathController(object):
         
         kappa_max = np.tan(self.max_steer_angle/self.steer_ratio)/self.wheel_base
         kappa_ref = 0.1*min(kappa_max,self.max_lat_accel/(max(3.0,v)**2))
-        Q = np.matrix([[1.0/(1.0**2),0,0],
+        Q = np.matrix([[1.0/((1.0)**2),0,0],
                        [0,1.0/((5.0*np.pi/180.0)**2),0],
                        [0,0,1.0/(kappa_ref**2)]])
         
@@ -82,7 +83,7 @@ class PathController(object):
         K = -np.matrix(scipy.linalg.inv(R)*(B.T*X))
         return K
     
-           
+    # lqr with kappa_diff as input assuming kappa path as a constant
     def lqr_lat2(self,v): 
         v = max(2.0,v)
         A = np.matrix([[0,v],
@@ -112,36 +113,41 @@ class PathController(object):
                 
         if not dbw_enabled:
             self.last_time = current_time
+            self.throttle_controller.reset()
             self.last_steering = current_steering_angle
             return 0.0, 0.0, 0.0
               
         self.localizeOnPath(current_pose,current_vel,ref_path)
         
-        print("valid: {}, Nd: {}, s: {:f}, d: {:f}, e_psi: {:f}, curv: {:f}, curv_pre: {:f}, v: {}, ax: {:f}, ax_pre: {:f}".format(self.valid,len(ref_path.waypoints),self.s,self.d,self.e_psi,self.kappa,self.kappa_pred,self.v,self.ax,self.ax_pred))
+        #print("valid: {}, Nd: {}, dt: {:f}, s: {:f}, d: {:f}, e_psi: {:f}, curv: {:f}, curv_pre: {:f}, v: {}, ax: {:f}, ax_pre: {:f}".format(self.valid,len(ref_path.waypoints),current_time - self.last_time,self.s,self.d,self.e_psi,self.kappa,self.kappa_pred,self.v,self.ax,self.ax_pred))
   
         if self.valid == False:
             self.last_time = current_time
+            self.throttle_controller.reset()
             self.last_steering = current_steering_angle
             return 0.0, 0.0, 0.0
         
-        dt = min(0.03,current_time - self.last_time)
+        dt = min(0.05,current_time - self.last_time)
         
-        v = 0.5*(self.v + np.abs(current_vel.twist.linear.x))
-        K_lat = self.lqr_lat(v)
-        K_lat = self.lqr_lat2(v)
-        scaling = self.steer_ratio* (1.0 +(current_vel.twist.linear.x/30.0)**2) # + yaw gain
-        last_curvature = np.tan(self.last_steering/scaling)/self.wheel_base
+        # lateral controller
+        v = 0.5*(self.v + np.abs(current_vel.twist.linear.x)) # mean velocity for linearitzation
+        scaling = self.steer_ratio* (1.0 +(current_vel.twist.linear.x/30.0)**2) # static + yaw gain
+        last_curvature = np.tan(self.last_steering/scaling)/self.wheel_base # calculate curvature from last steering angle as starting point
+        
+        # select controller type
         if USE_DERV_BASED_LQR > 0: 
             K_lat = self.lqr_lat(v)
             x0 = np.matrix([[self.d],[self.e_psi],[last_curvature-self.kappa_pred]])
-            new_curvature = dt*np.matmul(K_lat,x0) + last_curvature
+            new_curvature = last_curvature + 0.02*np.matmul(K_lat,x0) # integrator based update fixed sample time
         else:
             K_lat = self.lqr_lat2(v)
             x0 = np.matrix([[self.d],[self.e_psi]])
-            new_curvature = np.matmul(K_lat,x0) + self.kappa_pred
+            new_curvature = np.matmul(K_lat,x0) + self.kappa_pred # feedforward , feedback style
+            
         steering = max(-self.max_steer_angle,min(self.max_steer_angle, np.arctan(self.wheel_base * new_curvature) * scaling))
         self.last_steering = steering
        
+       # longitudinal controller
         vel_error = self.v - v
         self.last_vel = v
         
@@ -159,10 +165,15 @@ class PathController(object):
         
         return throttle, brake, steering
     
+    # localizing on track
     def localizeOnPath(self,pose,velocity,ref_path):
+        # get yaw angle
         quaternion = (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w)
         euler_angles = tf.transformations.euler_from_quaternion(quaternion)
+        
+        # decide what to do depending on length of refence path
         if len(ref_path.waypoints) > 1:
+            # find closest point on path to vehicle
             closest_point = None
             closest_dist  = None
             for i,wp in enumerate(ref_path.waypoints):
@@ -170,7 +181,9 @@ class PathController(object):
                 if None in (closest_point,closest_dist) or closest_dist > dist:
                     closest_dist = dist
                     closest_point = i
-                    
+            
+            # modify closest point in relationship to the second closest point
+            # ensure that the closest point is the the lower one closest and second closest point
             if closest_point is not None:
                 if closest_point == len(ref_path.waypoints)-1:
                     closest_point = len(ref_path.waypoints)-2
@@ -181,20 +194,23 @@ class PathController(object):
                     self.distance(pose.pose.position,ref_path.waypoints[closest_point + 1].pose.pose.position):
                         closest_point -= 1
             else:
-                self.valid = False
+                self.valid = False # not found so invalid
                 return
             
+            # get projection on path
             dx_path = ref_path.waypoints[closest_point+1].pose.pose.position.x - ref_path.waypoints[closest_point].pose.pose.position.x
             dy_path = ref_path.waypoints[closest_point+1].pose.pose.position.y - ref_path.waypoints[closest_point].pose.pose.position.y
             dist_total = max(1e-4,np.sqrt(dx_path*dx_path + dy_path*dy_path))
             dx_pose = pose.pose.position.x - ref_path.waypoints[closest_point].pose.pose.position.x
             dy_pose = pose.pose.position.y - ref_path.waypoints[closest_point].pose.pose.position.y
            
+            # get projection factor (0=on closest point; 1=on closest point +1 )
             proj_norm = (dx_pose*dx_path+dy_pose*dy_path)/(dist_total**2);
             proj_norm = max(0.0,min(1.0,proj_norm));
             proj_x = proj_norm*dx_path;
             proj_y = proj_norm*dy_path;
             
+            # evlauate ref path there
             self.s = ref_path.waypoints[closest_point].distance + proj_norm*(ref_path.waypoints[closest_point+1].distance -
                                                                               ref_path.waypoints[closest_point].distance)
             self.d = np.sign(dy_pose*dx_path- dx_pose*dy_path)*np.sqrt((proj_x-dx_pose)**2 + (proj_y-dy_pose)**2)
@@ -216,6 +232,7 @@ class PathController(object):
             self.ax = ref_path.waypoints[closest_point].acceleration_x + proj_norm*(ref_path.waypoints[closest_point+1].acceleration_x -
                                                                               ref_path.waypoints[closest_point].acceleration_x)
             
+            # get predictions
             count = 1
             self.kappa_pred = self.kappa
             ind = closest_point + 1
@@ -236,7 +253,7 @@ class PathController(object):
                 ind += 1
             self.ax_pred /= count
                             
-        else:
+        else: # if we have just one point use it directly
             self.s = ref_path.waypoints[0].distance
             self.e_psi = ((euler_angles[2] - ref_path.waypoints[0].yaw + np.pi) % (2.0*np.pi)) - np.pi
             self.d = np.cos(ref_path.waypoints[0].yaw)*(pose.pose.position.y - ref_path.waypoints[0].pose.pose.position.y) - \
@@ -255,11 +272,7 @@ class PathController(object):
                 self.valid = False
         else:
             self.valid = False
-            
                 
-    
-    
-    
     def distance(self, p1, p2):
         x, y, z = p1.x - p2.x, p1.y - p2.y, p1.z - p2.z
         return np.sqrt(x*x + y*y + z*z)

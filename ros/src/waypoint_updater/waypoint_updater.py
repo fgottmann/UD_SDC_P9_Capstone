@@ -88,8 +88,8 @@ class WaypointUpdater(object):
             p = Waypoint()
             p.pose = wp.pose
             
-            stop_idx = max(self.stopline_wp_idx - closest_idx - 2,0)
-            dist = max(0.0,self.distance(waypoints,i,stop_idx) -1.0)
+            stop_idx = min(len(waypoints)-1,max(self.stopline_wp_idx - closest_idx,0))
+            dist = max(0.0,self.distance(waypoints,i,stop_idx) -2.5) # brake before the stop point to maintain asafety gap
             vel = math.sqrt(2.0 * MAX_DECEL * dist)
             if vel < 1.0:
                 vel = 0.

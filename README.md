@@ -30,9 +30,13 @@ The traffic light detection uses a camera image and a map to determine relevant 
 
 The traffic light classifer uses a *ssd_mobilenet_v2_coco* in order to determine the color of the traffic light. This network is trained using the Tensorflow Object Detection API (a good how-to is given by a fellow udacity student [here](https://github.com/marcomarasca/SDCND-Traffic-Light-Detection)).
 
-I tested various networks, however i relied on a pretty small pretrained network with *ssd_mobilenet_v2_coco* as my laptop does not have a powerful GPU. Even this small network took about 250ms for evaluation localy. The final network was trained just using self-labeled simulator data and the provided data from carla, giving an accuracy of 97% on both. Thus, I used the same network for real-world and simulator data. I additionally tried to use data from the [LISA](https://www.kaggle.com/mbornoe/lisa-traffic-light-dataset) and [Bosch Dataset](https://github.com/bosch-ros-pkg/bstld), but these reduced significantly the performance in simulation. A larger net like *faster_rcnn_resnet101_coco* gave better results compared to *ssd_mobilenet_v2_coco* but there neglected due to the considerably longer runtime. However, even those results were worse in simulation than the model just trained the simulation and carla data. A further problem was that bosch-data has another aspect ratio than LISA and the udacity data, thus ssd-networks are problematic as they rely on a fixed size and different aspect ratios mapped on a fixed image size lead to distortions.
+I tested various networks, however i relied on a pretty small pretrained network with *ssd_mobilenet_v2_coco* as my laptop does not have a powerful GPU. Even this small network took about 250ms for evaluation localy. The final network was trained just using self-labeled simulator data and the provided data from carla, giving an accuracy of 95% on both. Thus, I used the same network for real-world and simulator data. I additionally tried to use data from the [LISA](https://www.kaggle.com/mbornoe/lisa-traffic-light-dataset) and [Bosch Dataset](https://github.com/bosch-ros-pkg/bstld), but these reduced significantly the performance in simulation. A larger net like *faster_rcnn_resnet101_coco* gave better results compared to *ssd_mobilenet_v2_coco* but there neglected due to the considerably longer runtime. However, even those results were worse in simulation than the model just trained the simulation and carla data. A further problem was that bosch-data has another aspect ratio than LISA and the udacity data, thus ssd-networks are problematic as they rely on a fixed size and different aspect ratios mapped on a fixed image size lead to distortions.
 
 Importers for those datasets to a tensorflow record file can be found in the tools folder.
+
+The detected traffic lights by the net are online verified with the map data e.g. detected traffic light and mapped traffic light have to be close to each other. Also the aspect ration of the traffic light have to be approximately 1/3. If the detection has also a sufficient rating by the neural network it is accepted and passed back to the tl_detector module.
+
+**Note:** Though the net is trained to classify between red, green and yellow lights, it outputs everytime a red light if its unsure. Only if its sure there is a green light it allows for continue driving.
 
 ### Waypoint Updater
 The waypoint updater basically manipulates the longitudinal velocity in order to stop at red traffic lights. The geometry of the path is maintained as given by the waypoint loader. The output of this module is just a short snippet in order to cover at least a few seconds e.g. to handle a timeout and to give the controller in the drive-by-wire system enough lookahead to compensate for latencies and to calculate smooth steering and powertrain commands.
@@ -52,3 +56,13 @@ This track was modified by elimating the overlap of start and end, which avoids 
 
 #### Simulating the Parklot
 Another launch script is added to use the parklot-track in simulation: *launch/site_sim.launch*. However, in this configuration the camera properties are removed to avoid undistorting an already undistorted image. In addition the simulator bridge was added to communicate with the unity simulator.
+
+### Further Open Points
+* Ego Vehicle Pose Prediction
+* Compensating for Image Recognition Latency
+* Trajectory Generation in Waypoint Updater e.g. to get a drivable trajectory especially for the parking lot scenario
+
+### Observed Problems
+* Severe Timeouts between Simulator and VM up to 3 seconds
+
+

@@ -97,6 +97,7 @@ class TLDetector(object):
 
         """
         
+        # avoid queue by allowing just processing one at a time
         if self.image_lock.acquire(blocking = False):
             self.has_image = True
             self.camera_image = msg
@@ -175,7 +176,7 @@ class TLDetector(object):
 #             cv2.imwrite("images/" + name, cv_image_undst)
 
         #Get classification
-        return self.light_classifier.get_classification(cv_image_undst)
+        return self.light_classifier.get_classification(cv_image_undst,self.dist_light,self.config['camera_info'])
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -186,6 +187,7 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
+        dist_stopline2light = 15
         closest_light = None
         line_wp_idx = None
 
@@ -207,13 +209,17 @@ class TLDetector(object):
                     closest_light = light
                     line_wp_idx = temp_wp_idx
             
+            # get distance to stopline
             if closest_light:
-                self.dist_light = self.distance(self.base_waypoints.waypoints,car_wp_idx,line_wp_idx)
+                self.dist_light = self.distance(self.base_waypoints.waypoints,car_wp_idx,line_wp_idx) + dist_stopline2light
         
+        # get comparing distances for validation
         a_stop = 1.0
         stop_t = np.abs(self.velocity.twist.linear.x)/a_stop
         stop_distance = np.abs(self.velocity.twist.linear.x) - 0.5*a_stop*(stop_t**2)
-        if closest_light:# and self.dist_light <= max(40.0,max(5.0*np.abs(self.velocity.twist.linear.x),2.0*stop_distance + 1.0*np.abs(self.velocity.twist.linear.x))): # only return waypoint if its close
+        
+        # evaluate traffic sign only if we are in a certain range
+        if closest_light and self.dist_light <= dist_stopline2light + max(40.0,max(8.0*np.abs(self.velocity.twist.linear.x),2.0*stop_distance + 3.0*np.abs(self.velocity.twist.linear.x))): # only return waypoint if its close
             state = self.get_light_state(closest_light)
             return line_wp_idx, state
         
