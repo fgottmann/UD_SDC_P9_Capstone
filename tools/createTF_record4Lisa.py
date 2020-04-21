@@ -22,8 +22,8 @@ tf.app.flags.mark_flag_as_required('labels_map_path')
 
 FLAGS = flags.FLAGS
 
-def create_tf_example(data_dir, label, labels_map):
-    file_path = os.path.join(data_dir, label['Filename'].split('/')[-1])
+def create_tf_example(data_dir, label_list, labels_map):
+    file_path = os.path.join(data_dir, label_list[0]['Filename'].split('/')[-1])
     print(file_path)
     print()
     with tf.gfile.GFile(file_path, 'rb') as fid:
@@ -57,77 +57,82 @@ def create_tf_example(data_dir, label, labels_map):
     width = int(1280)
     height = int(960)
 
-    filename = label['Filename'].encode('utf8')
-    ignore = 0 # ignore unknown situations
-
-    xmin.append(float(label['Upper left corner X']) / width)
-    ymin.append(float(label['Upper left corner Y']) / height)
-    xmax.append(float(label['Lower right corner X']) / width)
-    ymax.append(float(label['Lower right corner Y']) / height)
-    if label['Annotation tag'] == 'warning':
-        label['Annotation tag'] = 'Yellow'
-    elif label['Annotation tag'] == 'stop':
-        label['Annotation tag'] = 'Red'
-    elif label['Annotation tag'] == 'go':
-        label['Annotation tag'] = 'Green'
-    elif label['Annotation tag'] == 'goLeft':
-        label['Annotation tag'] = 'GreenLeft'
-    elif label['Annotation tag'] == 'stopLeft':
-        label['Annotation tag'] = 'RedLeft'
-    elif label['Annotation tag'] == 'warningLeft':
-        label['Annotation tag'] = 'Yellow'
-    elif label['Annotation tag'] == 'goRight':
-        label['Annotation tag'] = 'GreenRight'
-    elif label['Annotation tag'] == 'stopRight':
-        label['Annotation tag'] = 'RedRight'
-    elif label['Annotation tag'] == 'warningRight':
-        label['Annotation tag'] = 'Yellow'
-    elif label['Annotation tag'] == 'goForward':
-        label['Annotation tag'] = 'GreenStraight'
-    elif label['Annotation tag'] == 'stopForward':
-        label['Annotation tag'] = 'RedStraight'
-    elif label['Annotation tag'] == 'warningForward':
-        label['Annotation tag'] = 'Yellow'
-
-    if 0:
-        if label['Annotation tag'] == 'GreenRight':
-            label['Annotation tag'] = 'Green'
-            ignore = 1
-        elif label['Annotation tag'] == 'RedRight':
+    filename = label_list[0]['Filename'].encode('utf8')
+    ignore = 0 # ignore unknown situations, value init
+    
+    #ignoring properties
+    ignore_others = 0
+    merge_labels = 1
+    ignore_stop = 1
+        
+    for label in label_list:
+        xmin.append(float(label['Upper left corner X']) / width)
+        ymin.append(float(label['Upper left corner Y']) / height)
+        xmax.append(float(label['Lower right corner X']) / width)
+        ymax.append(float(label['Lower right corner Y']) / height)
+        if label['Annotation tag'] == 'warning':
+            label['Annotation tag'] = 'Yellow'
+        elif label['Annotation tag'] == 'stop':
             label['Annotation tag'] = 'Red'
-            ignore = 1
-        elif label['Annotation tag'] == 'GreenLeft':
+        elif label['Annotation tag'] == 'go':
             label['Annotation tag'] = 'Green'
-            ignore = 1
-        elif label['Annotation tag'] == 'RedLeft':
-            label['Annotation tag'] = 'Red'
-            ignore = 1
-        elif label['Annotation tag'] == 'GreenStraight':
-            label['Annotation tag'] = 'Green'
-            ignore = 1
-        elif label['Annotation tag'] == 'RedStraight':
-            label['Annotation tag'] = 'Red'
-            ignore = 1
-        elif label['Annotation tag'] == 'GreenStraightLeft':
-            label['Annotation tag'] = 'Green'
-            ignore = 1
-        elif label['Annotation tag'] == 'RedStraightLeft':
-            label['Annotation tag'] = 'Red'
-            ignore = 1
-        elif label['Annotation tag'] == 'GreenStraightRight':
-            label['Annotation tag'] = 'Green'
-            ignore = 1
-        elif label['Annotation tag'] == 'RedStraightRight':
-            label['Annotation tag'] = 'Red'
-            ignore = 1
-        elif label['Annotation tag'] == 'off':
-            a = 0
-            #label['Annotation tag'] = 'Red'
-            #ignore = 1
-
-    classes_text.append(label['Annotation tag'].encode('utf8'))
-    classes.append(labels_map[label['Annotation tag']])
-    truncated.append(int(0))
+        elif label['Annotation tag'] == 'goLeft':
+            label['Annotation tag'] = 'GreenLeft'
+        elif label['Annotation tag'] == 'stopLeft':
+            label['Annotation tag'] = 'RedLeft'
+        elif label['Annotation tag'] == 'warningLeft':
+            label['Annotation tag'] = 'Yellow'
+        elif label['Annotation tag'] == 'goRight':
+            label['Annotation tag'] = 'GreenRight'
+        elif label['Annotation tag'] == 'stopRight':
+            label['Annotation tag'] = 'RedRight'
+        elif label['Annotation tag'] == 'warningRight':
+            label['Annotation tag'] = 'Yellow'
+        elif label['Annotation tag'] == 'goForward':
+            label['Annotation tag'] = 'GreenStraight'
+        elif label['Annotation tag'] == 'stopForward':
+            label['Annotation tag'] = 'RedStraight'
+        elif label['Annotation tag'] == 'warningForward':
+            label['Annotation tag'] = 'Yellow'
+        
+        if label['Annotation tag'] == 'off':
+            ignore = max(ignore,ignore_stop)
+                        
+        if merge_labels:
+            if label['Annotation tag'] == 'GreenRight':
+                label['Annotation tag'] = 'Green'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'RedRight':
+                label['Annotation tag'] = 'Red'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'GreenLeft':
+                label['Annotation tag'] = 'Green'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'RedLeft':
+                label['Annotation tag'] = 'Red'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'GreenStraight':
+                label['Annotation tag'] = 'Green'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'RedStraight':
+                label['Annotation tag'] = 'Red'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'GreenStraightLeft':
+                label['Annotation tag'] = 'Green'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'RedStraightLeft':
+                label['Annotation tag'] = 'Red'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'GreenStraightRight':
+                label['Annotation tag'] = 'Green'
+                ignore = max(ignore,ignore_others)
+            elif label['Annotation tag'] == 'RedStraightRight':
+                label['Annotation tag'] = 'Red'
+                ignore = max(ignore,ignore_others)
+    
+        classes_text.append(label['Annotation tag'].encode('utf8'))
+        classes.append(labels_map[label['Annotation tag']])
+        truncated.append(int(0))
 
     tf_example = tf.train.Example(features=tf.train.Features(feature={
         'image/height': dataset_util.int64_feature(height),
@@ -149,11 +154,17 @@ def create_tf_example(data_dir, label, labels_map):
 def create_tf_record(label_files, data_dir, labels_map, output_path):
 
     writer = tf.python_io.TFRecordWriter(output_path)
-
-    for label in tqdm(label_files, desc='Converting', unit=' images'):
-        tf_record, ignore = create_tf_example(data_dir, label, labels_map)
+    
+    count = 0
+    label_list = []
+    for label_list in tqdm(label_files, desc='Converting', unit=' images'):
+        
+        tf_record, ignore = create_tf_example(data_dir, label_list, labels_map)
         if ignore == 0:
             writer.write(tf_record.SerializeToString())
+            
+        count += 1
+        
 
     writer.close()
 
@@ -165,8 +176,15 @@ def handle_directory(data_dir,labels_name, labels_map, output_path,output_name,s
         if os.path.isdir(data_dir_intern):
             labels_train = []
             reader = csv.DictReader(open(os.path.join(data_dir,labels_name),'rt'), delimiter=";")
-            for row in reader:
-                labels_train.append(row)
+
+            for i,row in enumerate(reader):
+                # only write if next filename will change or we just started importing (assuming list is sorted)
+                if i == 0 or labels_train[-1][0]['Filename'] != row['Filename']:
+                    labels_train.append([])
+                    labels_train[-1].append(row)
+                else: # if we resume with the same image we don't have to build a new struct
+                    labels_train[-1].append(row)
+            
             if split_train_test:
                 labels_train, labels_eval = train_test_split(labels_train, test_size = split_train_test, shuffle = True)
 

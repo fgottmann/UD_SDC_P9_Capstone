@@ -91,7 +91,7 @@ class TLClassifier(object):
             ar_tl = size_tl_h/size_tl_w
             # Traffic light thing
             self.current_light = TrafficLight.RED
-            min_score_thresh = .75
+            min_score_thresh = .65
             est_dist_eff = -1
             for i in range(num):
                 if scores[i] > min_score_thresh:
@@ -136,6 +136,6 @@ class TLClassifier(object):
                     est_dist_eff = est_dist
 
 
-        print("Type:{}; Score: {}; Dist: {}; AssumedDist: {}".format(self.current_light,min_score_thresh,est_dist_eff,assumed_distance))
+        #print("Type:{}; Score: {}; Dist: {}; AssumedDist: {}".format(self.current_light,min_score_thresh,est_dist_eff,assumed_distance))
 
         return self.current_light
