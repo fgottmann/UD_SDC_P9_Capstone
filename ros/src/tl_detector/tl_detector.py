@@ -62,6 +62,7 @@ class TLDetector(object):
         self.bridge = CvBridge()
 
         self.image_lock = threading.RLock()
+        self.lock = False
 
         
         self.light_classifier = TLClassifier()
@@ -98,7 +99,8 @@ class TLDetector(object):
         """
         
         # avoid queue by allowing just processing one at a time
-        if self.image_lock.acquire(blocking = False):
+        if self.image_lock.acquire(blocking = False) and not self.lock:
+            self.lock = True
             self.has_image = True
             self.camera_image = msg
             if self.pose and self.velocity and self.waypoints_2d and self.waypoint_tree and self.output_count >= 0:
@@ -128,6 +130,7 @@ class TLDetector(object):
                 self.upcoming_red_light_pub.publish(Int32(self.last_wp))
                 
             self.state_count += 1
+            self.lock = False
             
             self.image_lock.release()
             

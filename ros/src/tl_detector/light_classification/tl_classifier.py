@@ -16,8 +16,8 @@ class TLClassifier(object):
 
         cwd = os.path.dirname(os.path.realpath(__file__))
 
-        # Default to Simulation with 10 regions.
-        CKPT = cwd+'/model/graph.pb'
+        # Default to Simulation.
+        CKPT = cwd+'/model/graph_optimized.pb'
 
 
         # 14, as pretrained on bosch dataset with 14 classes
@@ -30,7 +30,6 @@ class TLClassifier(object):
         # end
 
         ##### Build network
-        self.image_np_deep = None
         self.detection_graph = tf.Graph()
 
         with self.detection_graph.as_default():
@@ -136,6 +135,6 @@ class TLClassifier(object):
                     est_dist_eff = est_dist
 
 
-        #print("Type:{}; Score: {}; Dist: {}; AssumedDist: {}".format(self.current_light,min_score_thresh,est_dist_eff,assumed_distance))
+       # print("Type:{}; Score: {}; Dist: {}; AssumedDist: {}".format(self.current_light,min_score_thresh,est_dist_eff,assumed_distance))
 
         return self.current_light

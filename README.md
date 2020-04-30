@@ -67,4 +67,8 @@ Another launch script is added to use the parklot-track in simulation: *launch/s
 ### Observed Problems
 * Severe Timeouts between Simulator and VM up to 3 seconds
 
+### Results
+If you click at the image you can watch a part of the validation video. Please not that the latency of the traffic light recognition is due to the communication between simulator and vm, where ros is running.
+[![Demo.png](Demo.png)](Demo.mp4)
+
 
